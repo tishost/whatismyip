@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:io';
 
 import '../../widgets/glass_card.dart';
 import '../../widgets/gradient_text.dart';
 import '../../../core/utils/app_theme.dart';
-import '../../../core/constants/strings.dart';
 import '../../../core/constants/colors.dart';
 
 class DnsScreen extends StatefulWidget {
@@ -82,7 +82,15 @@ class _DnsScreenState extends State<DnsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          // Navigate to home instead of popping
+          context.go('/');
+        }
+      },
+      child: Scaffold(
       body: Container(
         decoration: AppTheme.gradientBackground(),
         child: SafeArea(
@@ -251,6 +259,7 @@ class _DnsScreenState extends State<DnsScreen> {
           ),
         ),
       ),
+      ),
     );
   }
 
@@ -261,7 +270,7 @@ class _DnsScreenState extends State<DnsScreen> {
         children: [
           IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => context.go('/'),
           ),
           const Expanded(
             child: GradientText(

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'dart:math';
+import 'package:go_router/go_router.dart';
+import 'dart:async';
 
 import '../../widgets/glass_card.dart';
 import '../../widgets/gradient_text.dart';
 import '../../../core/utils/app_theme.dart';
-import '../../../core/constants/colors.dart';
+import '../../../core/services/speed_test_service.dart';
 
 class SpeedTestScreen extends StatefulWidget {
   const SpeedTestScreen({super.key});
@@ -29,47 +30,97 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> {
       _status = 'Testing ping...';
     });
 
-    // Simulate ping test
-    await Future.delayed(const Duration(seconds: 2));
-    setState(() {
-      _ping = 20 + Random().nextDouble() * 30;
-      _status = 'Testing download speed...';
-    });
+    try {
+      if (!mounted) return;
+      
+      // Test Ping
+      final pingResult = await SpeedTestService.testPing('google.com');
+      if (!mounted) return;
+      
+      if (pingResult > 0) {
+        setState(() {
+          _ping = pingResult;
+          _status = 'Testing download speed...';
+        });
+      } else {
+        setState(() {
+          _ping = 0;
+          _status = 'Ping test failed, continuing...';
+        });
+      }
 
-    // Simulate download test
-    for (int i = 0; i < 10; i++) {
-      await Future.delayed(const Duration(milliseconds: 300));
-      setState(() {
-        _downloadSpeed = (i + 1) * 5.0 + Random().nextDouble() * 2;
-      });
+      // Test Download Speed
+      final downloadResult = await SpeedTestService.testDownloadSpeedSimple(
+        onProgress: (speed) {
+          if (mounted) {
+            setState(() {
+              _downloadSpeed = speed;
+            });
+          }
+        },
+        durationSeconds: 10,
+      );
+
+      if (!mounted) return;
+
+      if (downloadResult > 0) {
+        setState(() {
+          _downloadSpeed = downloadResult;
+          _status = 'Testing upload speed...';
+        });
+      } else {
+        setState(() {
+          _status = 'Download test completed with limited data';
+        });
+      }
+
+      // Test Upload Speed
+      final uploadResult = await SpeedTestService.testUploadSpeed(
+        onProgress: (speed) {
+          if (mounted) {
+            setState(() {
+              _uploadSpeed = speed;
+            });
+          }
+        },
+        durationSeconds: 10,
+      );
+
+      if (!mounted) return;
+
+      if (uploadResult > 0) {
+        setState(() {
+          _uploadSpeed = uploadResult;
+        });
+      }
+
+      if (mounted) {
+        setState(() {
+          _isTesting = false;
+          _status = 'Test completed!';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isTesting = false;
+          _status = 'Test failed: ${e.toString()}';
+        });
+      }
     }
-
-    setState(() {
-      _status = 'Testing upload speed...';
-    });
-
-    // Simulate upload test
-    for (int i = 0; i < 10; i++) {
-      await Future.delayed(const Duration(milliseconds: 300));
-      setState(() {
-        _uploadSpeed = (i + 1) * 2.0 + Random().nextDouble() * 1;
-      });
-    }
-
-    setState(() {
-      _isTesting = false;
-      _status = 'Test completed!';
-    });
-
-    // Note: This is a simulation. For real speed test, integrate with:
-    // - Fast.com API
-    // - Speedtest.net API
-    // - Or implement your own backend
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          // Navigate to home instead of popping
+          context.go('/');
+        }
+      },
+      child: Scaffold(
       body: Container(
         decoration: AppTheme.gradientBackground(),
         child: SafeArea(
@@ -149,6 +200,7 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> {
           ),
         ),
       ),
+      ),
     );
   }
 
@@ -211,7 +263,7 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> {
         children: [
           IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => context.go('/'),
           ),
           Expanded(
             child: GradientText(

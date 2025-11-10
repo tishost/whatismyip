@@ -23,7 +23,7 @@ if (flutterVersionName == null) {
 }
 
 android {
-    namespace "com.example.what_is_my_ip"
+    namespace "io.digdns.whatismyip"
     compileSdkVersion 36
     ndkVersion flutter.ndkVersion
 
@@ -42,7 +42,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.example.what_is_my_ip"
+        applicationId "io.digdns.whatismyip"
         minSdkVersion flutter.minSdkVersion
         targetSdkVersion 36
         versionCode flutterVersionCode.toInteger()

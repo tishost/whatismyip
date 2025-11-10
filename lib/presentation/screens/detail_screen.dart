@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:clipboard/clipboard.dart';
 import 'package:share_plus/share_plus.dart';
@@ -16,7 +17,15 @@ class DetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          // Navigate to home instead of popping
+          context.go('/');
+        }
+      },
+      child: Scaffold(
       body: Container(
         decoration: AppTheme.gradientBackground(),
         child: SafeArea(
@@ -45,6 +54,7 @@ class DetailScreen extends StatelessWidget {
           ),
         ),
       ),
+      ),
     );
   }
 
@@ -55,7 +65,7 @@ class DetailScreen extends StatelessWidget {
         children: [
           IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => context.go('/'),
           ),
           const Expanded(
             child: GradientText(

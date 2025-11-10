@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../widgets/glass_card.dart';
 import '../../widgets/gradient_text.dart';
 import '../../../core/utils/app_theme.dart';
-import '../../../core/constants/strings.dart';
 import '../../../core/constants/colors.dart';
 
 class PingScreen extends StatefulWidget {
@@ -96,7 +96,15 @@ class _PingScreenState extends State<PingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          // Navigate to home instead of popping
+          context.go('/');
+        }
+      },
+      child: Scaffold(
       body: Container(
         decoration: AppTheme.gradientBackground(),
         child: SafeArea(
@@ -244,6 +252,7 @@ class _PingScreenState extends State<PingScreen> {
           ),
         ),
       ),
+      ),
     );
   }
 
@@ -282,7 +291,7 @@ class _PingScreenState extends State<PingScreen> {
             icon: const Icon(Icons.arrow_back, color: Colors.white),
             onPressed: () {
               _stopPing();
-              Navigator.pop(context);
+              context.go('/');
             },
           ),
           const Expanded(

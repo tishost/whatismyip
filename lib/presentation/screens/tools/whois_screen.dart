@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 
 import '../../widgets/glass_card.dart';
 import '../../widgets/gradient_text.dart';
 import '../../../core/utils/app_theme.dart';
-import '../../../core/constants/strings.dart';
 import '../../../core/constants/colors.dart';
 
 class WhoisScreen extends StatefulWidget {
@@ -90,7 +90,15 @@ class _WhoisScreenState extends State<WhoisScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          // Navigate to home instead of popping
+          context.go('/');
+        }
+      },
+      child: Scaffold(
       body: Container(
         decoration: AppTheme.gradientBackground(),
         child: SafeArea(
@@ -206,6 +214,7 @@ class _WhoisScreenState extends State<WhoisScreen> {
           ),
         ),
       ),
+      ),
     );
   }
 
@@ -216,7 +225,7 @@ class _WhoisScreenState extends State<WhoisScreen> {
         children: [
           IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => context.go('/'),
           ),
           const Expanded(
             child: GradientText(

@@ -8,12 +8,12 @@ import 'presentation/providers/ip_provider.dart';
 import 'presentation/providers/theme_provider.dart';
 import 'presentation/providers/language_provider.dart';
 import 'presentation/providers/tools_provider.dart';
-import 'presentation/screens/home_screen.dart';
 import 'core/services/ip_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/utils/app_theme.dart';
 import 'core/utils/localization.dart';
 import 'core/constants/app_constants.dart';
+import 'core/router/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -55,7 +55,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer2<ThemeProvider, LanguageProvider>(
       builder: (context, themeProvider, languageProvider, child) {
-        return MaterialApp(
+        return MaterialApp.router(
           title: 'What Is My IP',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
@@ -69,7 +69,7 @@ class MyApp extends StatelessWidget {
           localizationsDelegates: const [
             AppLocalizations.delegate,
           ],
-          home: const HomeScreen(),
+          routerConfig: AppRouter.router,
         );
       },
     );

@@ -45,12 +45,23 @@ class AppTheme {
     ),
   );
 
-  static BoxDecoration gradientBackground() {
-    return const BoxDecoration(
+  static BoxDecoration gradientBackground({Brightness? brightness}) {
+    final isDark = brightness == Brightness.dark;
+    return BoxDecoration(
       gradient: LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [AppColors.deepBlue, AppColors.purple, AppColors.violet],
+        colors: isDark
+            ? [
+                const Color(0xFF1A1C99), // Darker blue
+                const Color(0xFF5A1D99), // Darker purple
+                const Color(0xFF4A0D7A), // Darker violet
+              ]
+            : [
+                AppColors.deepBlue,
+                AppColors.purple,
+                AppColors.violet,
+              ],
       ),
     );
   }

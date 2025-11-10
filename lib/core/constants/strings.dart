@@ -6,6 +6,7 @@ class AppStrings {
   // Navigation
   static const String home = 'Home';
   static const String tools = 'Tools';
+  static const String deviceInfo = 'Device Info';
   static const String settings = 'Settings';
   
   // IP Info

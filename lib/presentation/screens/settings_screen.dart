@@ -2,13 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/theme_provider.dart';
-import '../providers/language_provider.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/gradient_text.dart';
 import '../../core/utils/app_theme.dart';
-import '../../core/services/ad_service.dart';
-import '../../core/constants/strings.dart';
-import '../../core/constants/app_constants.dart';
 import '../../core/constants/colors.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -46,10 +42,6 @@ class SettingsScreen extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       _buildThemeSection(context),
-                      const SizedBox(height: 16),
-                      _buildLanguageSection(context),
-                      const SizedBox(height: 16),
-                      _buildProSection(context),
                       const SizedBox(height: 16),
                       _buildAboutSection(context),
                       const SizedBox(height: 24), // Extra space for scrolling
@@ -98,104 +90,6 @@ class SettingsScreen extends StatelessWidget {
                     ThemeMode.dark,
                     themeProvider.themeMode,
                     (mode) => themeProvider.setThemeMode(mode),
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLanguageSection(BuildContext context) {
-    return GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const GradientText(
-            'Language',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Consumer<LanguageProvider>(
-            builder: (context, languageProvider, child) {
-              return Column(
-                children: [
-                  _buildRadioTile(
-                    'English',
-                    const Locale('en', 'US'),
-                    languageProvider.locale,
-                    (locale) => languageProvider.setLocale(locale),
-                  ),
-                  _buildRadioTile(
-                    'বাংলা (Bangla)',
-                    const Locale('bn', 'BD'),
-                    languageProvider.locale,
-                    (locale) => languageProvider.setLocale(locale),
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProSection(BuildContext context) {
-    return GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const GradientText(
-            'Pro Features',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          FutureBuilder<bool>(
-            future: AdService.isProUser(),
-            builder: (context, snapshot) {
-              final isPro = snapshot.data ?? false;
-              return Column(
-                children: [
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(
-                      isPro ? Icons.verified : Icons.lock,
-                      color: isPro ? Colors.green : Colors.orange,
-                    ),
-                    title: Text(
-                      isPro ? 'Pro User' : 'Free User',
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    subtitle: Text(
-                      isPro
-                          ? 'Enjoy ad-free experience'
-                          : 'Upgrade to remove ads',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
-                      ),
-                    ),
-                    trailing: isPro
-                        ? null
-                        : TextButton(
-                            onPressed: () {
-                              // Navigate to pro purchase screen
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Pro purchase coming soon!'),
-                                ),
-                              );
-                            },
-                            child: const Text('Upgrade'),
-                          ),
                   ),
                 ],
               );

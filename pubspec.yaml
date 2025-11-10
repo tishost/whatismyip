@@ -20,6 +20,9 @@ dependencies:
   # State Management
   provider: ^6.1.1
   
+  # Navigation
+  go_router: ^13.2.0
+  
   # Networking
   http: ^1.2.0
   dio: ^5.4.0
@@ -63,9 +66,9 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   
-  # assets:
-  #   - assets/images/
-  #   - assets/icons/
+  assets:
+    - assets/images/
+    - assets/icons/
   
   # fonts:
   #   - family: Poppins

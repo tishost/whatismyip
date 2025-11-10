@@ -19,12 +19,24 @@ class GradientText extends StatelessWidget {
     return ShaderMask(
       shaderCallback: (bounds) => (gradient ?? const LinearGradient(
         colors: [AppColors.neonBlue, AppColors.neonPurple],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
       )).createShader(
         Rect.fromLTWH(0, 0, bounds.width, bounds.height),
       ),
+      blendMode: BlendMode.srcATop,
       child: Text(
         text,
-        style: style?.copyWith(color: Colors.white),
+        style: (style ?? const TextStyle()).copyWith(
+          color: Colors.white,
+          shadows: [
+            Shadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
       ),
     );
   }

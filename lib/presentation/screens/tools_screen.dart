@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../data/models/tool_result.dart';
 import '../widgets/tool_card.dart';
 import 'tools/whois_screen.dart';
@@ -15,22 +16,22 @@ class ToolsScreen extends StatelessWidget {
   const ToolsScreen({super.key});
 
   void _navigateToTool(BuildContext context, ToolType toolType) {
-    Widget screen;
+    String route;
     switch (toolType) {
       case ToolType.whois:
-        screen = const WhoisScreen();
+        route = '/tools/whois';
         break;
       case ToolType.dns:
-        screen = const DnsScreen();
+        route = '/tools/dns';
         break;
       case ToolType.ping:
-        screen = const PingScreen();
+        route = '/tools/ping';
         break;
       case ToolType.speedTest:
-        screen = const SpeedTestScreen();
+        route = '/tools/speed-test';
         break;
       case ToolType.traceroute:
-        screen = const TracerouteScreen();
+        route = '/tools/traceroute';
         break;
       default:
         ScaffoldMessenger.of(context).showSnackBar(
@@ -39,7 +40,7 @@ class ToolsScreen extends StatelessWidget {
         return;
     }
     
-    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+    context.push(route);
   }
 
   @override
