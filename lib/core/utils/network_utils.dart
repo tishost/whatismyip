@@ -59,7 +59,7 @@ class NetworkUtils {
         final results = result as List<ConnectivityResult>;
         connectionResult = results.isNotEmpty ? results.first : ConnectivityResult.none;
       } else {
-        connectionResult = result as ConnectivityResult;
+        connectionResult = result;
       }
       
       if (connectionResult == ConnectivityResult.wifi) {
@@ -71,10 +71,10 @@ class NetworkUtils {
       } else if (connectionResult == ConnectivityResult.vpn) {
         return 'VPN';
       } else {
-        return 'Unknown';
+        return 'Not Connected';
       }
     } catch (e) {
-      return 'Unknown';
+      return 'Not Connected';
     }
   }
 

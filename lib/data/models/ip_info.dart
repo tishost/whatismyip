@@ -101,10 +101,10 @@ class IpInfo {
 
   String get displayLocation {
     final parts = <String>[];
-    if (city != null) parts.add(city!);
-    if (region != null) parts.add(region!);
-    if (country != null) parts.add(country!);
-    return parts.isEmpty ? 'Unknown' : parts.join(', ');
+    if (city != null && city!.isNotEmpty) parts.add(city!);
+    if (region != null && region!.isNotEmpty) parts.add(region!);
+    if (country != null && country!.isNotEmpty) parts.add(country!);
+    return parts.isEmpty ? '' : parts.join(', ');
   }
 
   bool get hasLocation => latitude != null && longitude != null;

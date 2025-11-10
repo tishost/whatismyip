@@ -113,6 +113,30 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
+          // App Logo with proper constraints to prevent overflow
+          Center(
+            child: Container(
+              constraints: const BoxConstraints(
+                maxWidth: 120,
+                maxHeight: 120,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Image.asset(
+                  'assets/images/app_logo.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Icon(
+                      Icons.network_check,
+                      size: 80,
+                      color: Colors.white70,
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
           _buildInfoRow('Version', '1.0.0'),
           _buildInfoRow('Build', '1'),
           const SizedBox(height: 16),

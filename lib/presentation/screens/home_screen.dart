@@ -887,10 +887,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildInfoRowWithoutCopy(String label, String value) {
-    return _buildModernInfoRow(label, value, Icons.info_outline);
-  }
-
   Widget _buildConnectionDetailsSection() {
     return Consumer<IpProvider>(
       builder: (context, ipProvider, child) {
@@ -1188,7 +1184,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final ipInfo = ipProvider.ipInfo;
         if (ipInfo == null) return const SizedBox();
 
-        final hasData = ipInfo.displayLocation != 'Unknown' ||
+        final hasData = ipInfo.displayLocation.isNotEmpty ||
             ipInfo.city != null ||
             ipInfo.region != null ||
             ipInfo.country != null ||
@@ -1252,14 +1248,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                if (ipInfo.displayLocation != 'Unknown')
+                if (ipInfo.displayLocation.isNotEmpty)
                   _buildMetadataRow(
                     AppStrings.location,
                     ipInfo.displayLocation,
                     icon: Icons.location_on,
                   ),
                 if (ipInfo.city != null) ...[
-                  if (ipInfo.displayLocation != 'Unknown') const SizedBox(height: 12),
+                  if (ipInfo.displayLocation.isNotEmpty) const SizedBox(height: 12),
                   _buildMetadataRow('City', ipInfo.city!, icon: Icons.location_city),
                 ],
                 if (ipInfo.region != null) ...[

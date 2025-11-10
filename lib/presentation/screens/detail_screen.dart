@@ -88,11 +88,13 @@ class DetailScreen extends StatelessWidget {
         children: [
           if (ipInfo.ipv4 != null) _buildInfoRow('IPv4', ipInfo.ipv4!),
           if (ipInfo.ipv6 != null) _buildInfoRow('IPv6', ipInfo.ipv6!),
-          _buildInfoRow('ISP', ipInfo.isp ?? 'Unknown'),
+          if (ipInfo.isp != null && ipInfo.isp!.isNotEmpty)
+            _buildInfoRow('ISP', ipInfo.isp!),
           if (ipInfo.asn != null) _buildInfoRow('ASN', ipInfo.asn!),
           if (ipInfo.organization != null)
             _buildInfoRow('Organization', ipInfo.organization!),
-          _buildInfoRow('Country', ipInfo.country ?? 'Unknown'),
+          if (ipInfo.country != null && ipInfo.country!.isNotEmpty)
+            _buildInfoRow('Country', ipInfo.country!),
           if (ipInfo.countryCode != null)
             _buildInfoRow('Country Code', ipInfo.countryCode!),
           if (ipInfo.region != null) _buildInfoRow('Region', ipInfo.region!),
