@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:dio/dio.dart';
 import 'dart:io';
 
 import '../../widgets/glass_card.dart';
 import '../../widgets/gradient_text.dart';
-import '../../../core/utils/app_theme.dart';
-import '../../../core/constants/colors.dart';
+import '../../widgets/tool_screen_wrapper.dart';
+import '../../widgets/common_input_decoration.dart';
+import '../../widgets/loading_indicator.dart';
 
 class DnsScreen extends StatefulWidget {
   const DnsScreen({super.key});
@@ -22,22 +23,46 @@ class _DnsScreenState extends State<DnsScreen> {
   Map<String, dynamic>? _dnsResults;
   bool _isLoading = false;
   String? _error;
+  final Dio _dio = Dio();
 
   final List<String> _recordTypes = ['A', 'AAAA', 'MX', 'NS', 'TXT', 'CNAME'];
+
+  String _normalizeDomain(String input) {
+    var s = input.trim().toLowerCase();
+    s = s.replaceAll(RegExp(r'^https?://'), '');
+    s = s.replaceAll(RegExp(r'^www\.'), '');
+    final q = s.indexOf('?');
+    if (q != -1) s = s.substring(0, q);
+    final slash = s.indexOf('/');
+    if (slash != -1) s = s.substring(0, slash);
+    return s;
+  }
+
+  bool _isValidDomain(String domain) {
+    final re = RegExp(r'^(?!-)(?:[a-z0-9-]{1,63}(?<!-)\.)+(?:[a-z]{2,63}|xn--[a-z0-9]{1,59})$');
+    return re.hasMatch(domain);
+  }
 
   @override
   void dispose() {
     _domainController.dispose();
     _recordTypeController.dispose();
+    _dio.close();
     super.dispose();
   }
 
   Future<void> _performDnsLookup() async {
-    final domain = _domainController.text.trim();
+    FocusScope.of(context).unfocus();
+    final domain = _normalizeDomain(_domainController.text);
     final recordType = _recordTypeController.text.trim().toUpperCase();
 
     if (domain.isEmpty) {
       setState(() => _error = 'Please enter a domain name');
+      return;
+    }
+
+    if (!_isValidDomain(domain)) {
+      setState(() => _error = 'Please enter a valid domain (e.g., example.com)');
       return;
     }
 
@@ -50,24 +75,99 @@ class _DnsScreenState extends State<DnsScreen> {
       _isLoading = true;
       _error = null;
       _dnsResults = null;
+      _domainController.text = domain;
+      _domainController.selection = TextSelection.fromPosition(
+        TextPosition(offset: domain.length),
+      );
     });
 
     try {
       final results = <String, List<String>>{};
 
-      // Perform DNS lookup using dart:io
-      // Note: This is a simplified version. For production, use a proper DNS library
-      if (recordType == 'A' || recordType == 'ALL') {
-        try {
-          final addresses = await InternetAddress.lookup(domain);
-          results['A'] = addresses.map((a) => a.address).toList();
-        } catch (e) {
-          results['A'] = ['Not found'];
+      // Use Google DNS over HTTPS API for all record types
+      final dnsType = _getDnsType(recordType);
+      final url = 'https://dns.google/resolve?name=$domain&type=$dnsType';
+
+      try {
+        final response = await _dio.get(
+          url,
+          options: Options(
+            headers: {
+              'Accept': 'application/dns-json',
+            },
+            receiveTimeout: const Duration(seconds: 10),
+          ),
+        );
+
+        if (response.statusCode == 200 && response.data != null) {
+          final data = response.data;
+          
+          if (data['Status'] == 0 && data['Answer'] != null) {
+            final answers = data['Answer'] as List;
+            final recordList = <String>[];
+
+            for (var answer in answers) {
+              final dataValue = answer['data'] as String?;
+
+              if (dataValue != null && dataValue.isNotEmpty) {
+                String formattedValue = dataValue;
+
+                // Format based on record type
+                if (recordType == 'MX') {
+                  // MX records: priority exchange
+                  final parts = dataValue.split(' ');
+                  if (parts.length >= 2) {
+                    formattedValue = 'Priority: ${parts[0]}, Exchange: ${parts.sublist(1).join(' ')}';
+                  }
+                } else if (recordType == 'TXT') {
+                  // TXT records might have quotes
+                  formattedValue = dataValue.replaceAll('"', '');
+                } else if (recordType == 'CNAME') {
+                  // CNAME records
+                  formattedValue = dataValue;
+                } else if (recordType == 'NS') {
+                  // NS records
+                  formattedValue = dataValue;
+                } else if (recordType == 'AAAA') {
+                  // AAAA records (IPv6)
+                  formattedValue = dataValue;
+                } else if (recordType == 'A') {
+                  // A records (IPv4)
+                  formattedValue = dataValue;
+                }
+
+                recordList.add(formattedValue);
+              }
+            }
+
+            if (recordList.isNotEmpty) {
+              results[recordType] = recordList;
+            } else {
+              results[recordType] = ['No records found'];
+            }
+          } else if (data['Status'] == 3) {
+            // NXDOMAIN - domain does not exist
+            results[recordType] = ['Domain not found'];
+          } else {
+            results[recordType] = ['No records found'];
+          }
+        } else {
+          results[recordType] = ['Failed to fetch DNS records'];
+        }
+      } catch (e) {
+        // Fallback to basic A record lookup for A type only
+        if (recordType == 'A') {
+          try {
+            final addresses = await InternetAddress.lookup(domain);
+            results['A'] = addresses.map((a) => a.address).toList();
+          } catch (_) {
+            results[recordType] = ['Not found'];
+          }
+        } else {
+          results[recordType] = ['Error: ${e.toString()}'];
         }
       }
 
-      // For other record types, you would need a DNS library or API
-      // This is a placeholder - implement with actual DNS lookup service
       setState(() {
         _dnsResults = results;
         _isLoading = false;
@@ -80,82 +180,59 @@ class _DnsScreenState extends State<DnsScreen> {
     }
   }
 
+  int _getDnsType(String recordType) {
+    switch (recordType) {
+      case 'A':
+        return 1;
+      case 'AAAA':
+        return 28;
+      case 'MX':
+        return 15;
+      case 'NS':
+        return 2;
+      case 'TXT':
+        return 16;
+      case 'CNAME':
+        return 5;
+      default:
+        return 1;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvoked: (didPop) {
-        if (!didPop) {
-          // Navigate to home instead of popping
-          context.go('/');
-        }
-      },
-      child: Scaffold(
-      body: Container(
-        decoration: AppTheme.gradientBackground(),
-        child: SafeArea(
-          child: Column(
-            children: [
-              _buildAppBar(),
-              Expanded(
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      GlassCard(
+    return ToolScreenWrapper(
+      title: 'DNS Lookup',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GlassCard(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             TextField(
                               controller: _domainController,
                               style: const TextStyle(color: Colors.white),
-                              decoration: InputDecoration(
+                              keyboardType: TextInputType.url,
+                              textInputAction: TextInputAction.search,
+                              onSubmitted: (_) {
+                                if (_isLoading) return;
+                                FocusScope.of(context).unfocus();
+                                _performDnsLookup();
+                              },
+                              decoration: CommonInputDecoration.textField(
                                 labelText: 'Domain Name',
-                                labelStyle: TextStyle(
-                                  color: Colors.white.withOpacity(0.7),
-                                ),
                                 hintText: 'example.com',
-                                hintStyle: TextStyle(
-                                  color: Colors.white.withOpacity(0.5),
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: Colors.white.withOpacity(0.3),
-                                  ),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: Colors.white.withOpacity(0.3),
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: AppColors.neonBlue,
-                                    width: 2,
-                                  ),
-                                ),
                               ),
                             ),
                             const SizedBox(height: 16),
                             DropdownButtonFormField<String>(
-                              value: _recordTypes.first,
-                              decoration: InputDecoration(
+                              value: _recordTypeController.text.isEmpty 
+                                  ? _recordTypes.first 
+                                  : _recordTypeController.text,
+                              decoration: CommonInputDecoration.textField(
                                 labelText: 'Record Type',
-                                labelStyle: TextStyle(
-                                  color: Colors.white.withOpacity(0.7),
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: Colors.white.withOpacity(0.3),
-                                  ),
-                                ),
                               ),
                               dropdownColor: Colors.black87,
                               style: const TextStyle(color: Colors.white),
@@ -167,23 +244,24 @@ class _DnsScreenState extends State<DnsScreen> {
                               }).toList(),
                               onChanged: (value) {
                                 if (value != null) {
-                                  _recordTypeController.text = value;
+                                  setState(() {
+                                    _recordTypeController.text = value;
+                                  });
                                 }
                               },
                             ),
                             const SizedBox(height: 16),
                             ElevatedButton.icon(
-                              onPressed: _isLoading ? null : _performDnsLookup,
+                              onPressed: _isLoading
+                                  ? null
+                                  : () {
+                                      FocusScope.of(context).unfocus();
+                                      _performDnsLookup();
+                                    },
                               icon: _isLoading
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                                Colors.white),
-                                      ),
+                                  ? const CommonLoadingIndicator(
+                                      size: 20,
+                                      color: Colors.white,
                                     )
                                   : const Icon(Icons.search),
                               label: const Text('Lookup'),
@@ -194,9 +272,26 @@ class _DnsScreenState extends State<DnsScreen> {
                       if (_error != null) ...[
                         const SizedBox(height: 16),
                         GlassCard(
-                          child: Text(
-                            _error!,
-                            style: const TextStyle(color: Colors.red),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.red.withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(Icons.error_outline, color: Colors.red.shade300, size: 20),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    _error!,
+                                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
@@ -251,36 +346,6 @@ class _DnsScreenState extends State<DnsScreen> {
                           ),
                         ),
                       ],
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      ),
-    );
-  }
-
-  Widget _buildAppBar() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => context.go('/'),
-          ),
-          const Expanded(
-            child: GradientText(
-              'DNS Lookup',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
         ],
       ),
     );

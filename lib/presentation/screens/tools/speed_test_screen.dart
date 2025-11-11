@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'dart:async';
 
 import '../../widgets/glass_card.dart';
-import '../../widgets/gradient_text.dart';
-import '../../../core/utils/app_theme.dart';
+import '../../widgets/tool_screen_wrapper.dart';
+import '../../widgets/loading_indicator.dart';
 import '../../../core/services/speed_test_service.dart';
 
 class SpeedTestScreen extends StatefulWidget {
@@ -112,29 +111,12 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvoked: (didPop) {
-        if (!didPop) {
-          // Navigate to home instead of popping
-          context.go('/');
-        }
-      },
-      child: Scaffold(
-      body: Container(
-        decoration: AppTheme.gradientBackground(),
-        child: SafeArea(
-          child: Column(
-            children: [
-              _buildAppBar(),
-              Expanded(
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+    return ToolScreenWrapper(
+      title: 'Speed Test',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
                       GlassCard(
                         child: Column(
                           children: [
@@ -150,15 +132,9 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> {
                             ElevatedButton.icon(
                               onPressed: _isTesting ? null : _startSpeedTest,
                               icon: _isTesting
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                                Colors.white),
-                                      ),
+                                  ? const CommonLoadingIndicator(
+                                      size: 20,
+                                      color: Colors.white,
                                     )
                                   : const Icon(Icons.speed),
                               label: Text(_isTesting
@@ -192,14 +168,7 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> {
                         Icons.network_ping,
                         Colors.orange,
                       ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+        ],
       ),
     );
   }
@@ -256,26 +225,4 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> {
     );
   }
 
-  Widget _buildAppBar() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => context.go('/'),
-          ),
-          Expanded(
-            child: GradientText(
-              'Speed Test',
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

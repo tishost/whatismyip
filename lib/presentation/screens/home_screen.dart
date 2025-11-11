@@ -7,24 +7,29 @@
 // - Import from '../providers/' for providers
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:clipboard/clipboard.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:async';
 
 import '../providers/ip_provider.dart';
+import '../providers/back_button_provider.dart';
+import '../../data/models/ip_info.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/particle_background.dart';
 import '../widgets/animated_ip_text.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/strings.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/utils/app_theme.dart';
 import '../../core/services/ad_service.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   final StatefulNavigationShell? navigationShell;
   
   const HomeScreen({
@@ -33,21 +38,47 @@ class HomeScreen extends StatefulWidget {
   });
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
 // Separate widget for home tab content
-class HomeScreenContent extends StatelessWidget {
+class HomeScreenContent extends ConsumerWidget {
   const HomeScreenContent({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return const _HomeTabContent();
   }
 }
 
-class _HomeTabContent extends StatelessWidget {
+class _HomeTabContent extends ConsumerStatefulWidget {
   const _HomeTabContent();
+
+  @override
+  ConsumerState<_HomeTabContent> createState() => _HomeTabContentState();
+}
+
+class _HomeTabContentState extends ConsumerState<_HomeTabContent> {
+  void _shareIpInfo(BuildContext context, IpInfo ipInfo) {
+
+    final buffer = StringBuffer();
+    buffer.writeln('🌐 IP Information\n');
+    if (ipInfo.ipv4 != null) buffer.writeln('IPv4: ${ipInfo.ipv4}');
+    if (ipInfo.ipv6 != null) buffer.writeln('IPv6: ${ipInfo.ipv6}');
+    if (ipInfo.isp != null) buffer.writeln('ISP: ${ipInfo.isp}');
+    if (ipInfo.organization != null) buffer.writeln('Organization: ${ipInfo.organization}');
+    if (ipInfo.country != null) buffer.writeln('Country: ${ipInfo.country}');
+    if (ipInfo.city != null) buffer.writeln('City: ${ipInfo.city}');
+    if (ipInfo.region != null) buffer.writeln('Region: ${ipInfo.region}');
+    if (ipInfo.timezone != null) buffer.writeln('Timezone: ${ipInfo.timezone}');
+    if (ipInfo.latitude != null && ipInfo.longitude != null) {
+      buffer.writeln('Location: ${ipInfo.latitude}, ${ipInfo.longitude}');
+    }
+    buffer.writeln('\nShared from What Is My IP app');
+    buffer.writeln('Powered by digdns.io');
+
+    Share.share(buffer.toString());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -94,33 +125,55 @@ class _HomeTabContent extends StatelessWidget {
                       ),
                     ),
                   ),
-                  // Refresh icon on right
-                  Consumer<IpProvider>(
-                    builder: (context, ipProvider, child) {
-                      return Material(
-                        color: Colors.transparent,
-                        child: IconButton(
-                          onPressed: ipProvider.isLoading
-                              ? null
-                              : () => ipProvider.refresh(),
-                          icon: ipProvider.isLoading
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white,
-                                    ),
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.refresh_rounded,
+                  // Share and Refresh icons on right
+                  Consumer(
+                    builder: (context, ref, child) {
+                      final ipState = ref.watch(ipProvider);
+                      final ipNotifier = ref.read(ipProvider.notifier);
+                      return Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Share button
+                          if (ipState.ipInfo != null)
+                            Material(
+                              color: Colors.transparent,
+                              child: IconButton(
+                                onPressed: () => _shareIpInfo(context, ipState.ipInfo!),
+                                icon: const Icon(
+                                  Icons.share_rounded,
                                   color: Colors.white,
                                   size: 24,
                                 ),
-                          tooltip: 'Refresh',
-                        ),
+                                tooltip: 'Share IP Info',
+                              ),
+                            ),
+                          // Refresh button
+                          Material(
+                            color: Colors.transparent,
+                            child: IconButton(
+                              onPressed: ipState.isLoading
+                                  ? null
+                                  : () => ipNotifier.refresh(),
+                              icon: ipState.isLoading
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white,
+                                        ),
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.refresh_rounded,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
+                              tooltip: 'Refresh',
+                            ),
+                          ),
+                        ],
                       );
                     },
                   ),
@@ -133,7 +186,7 @@ class _HomeTabContent extends StatelessWidget {
         Expanded(
           child: RefreshIndicator(
             onRefresh: () async {
-              await context.read<IpProvider>().refresh();
+              await ref.read(ipProvider.notifier).refresh();
             },
             color: AppColors.neonBlue,
             backgroundColor: Colors.black.withOpacity(0.3),
@@ -197,19 +250,109 @@ class _AddressDetailsSectionWidget extends StatelessWidget {
   }
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
   BannerAd? _bannerAd;
   bool _isBannerAdReady = false;
   StreamSubscription<dynamic>? _connectivitySubscription;
   ConnectivityResult? _lastConnectivityResult;
+  String? _currentRoute;
   
   int get _currentIndex => widget.navigationShell?.currentIndex ?? 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadBannerAd();
     _setupConnectivityListener();
+    _setupBackButtonHandler();
+    _setupRouteListener();
+  }
+  
+  void _setupBackButtonHandler() {
+    // Setup MethodChannel for MainActivity to receive back button events
+    const platform = MethodChannel('io.digdns.whatismyip/back_button');
+    platform.setMethodCallHandler((call) async {
+      if (call.method == 'onBackPressed') {
+        if (!mounted) {
+          return {'handled': false};
+        }
+        
+        // Get result from back button handler
+        final shouldPreventExit = await _handleBackPressForMethodChannel();
+        
+        // Return result to MainActivity
+        // If shouldPreventExit is true, prevent app close
+        // If false, allow app close (double-tap confirmed)
+        return {'handled': shouldPreventExit};
+      }
+      return null;
+    });
+  }
+  
+  Future<bool> _handleBackPressForMethodChannel() async {
+    if (!mounted) return false;
+    
+    try {
+      final backButtonNotifier = ref.read(backButtonProvider.notifier);
+      // Get current path from GoRouter
+      final router = GoRouter.of(context);
+      final currentPath = router.routerDelegate.currentConfiguration.uri.path;
+      
+      final shouldPreventExit = await backButtonNotifier.handleBackPress(
+        context,
+        currentPath,
+        navigationShell: widget.navigationShell,
+      );
+      
+      // If double-tap confirmed, don't prevent exit (return false)
+      if (!shouldPreventExit && mounted) {
+        // Don't call SystemNavigator.pop() here - let MainActivity handle it
+        return false; // Allow MainActivity to close app
+      }
+      
+      return true; // Prevent app close
+    } catch (e) {
+      return false; // On error, allow default behavior
+    }
+  }
+
+  void _shareIpInfo(BuildContext context, IpInfo ipInfo) {
+
+    final buffer = StringBuffer();
+    buffer.writeln('🌐 IP Information\n');
+    if (ipInfo.ipv4 != null) buffer.writeln('IPv4: ${ipInfo.ipv4}');
+    if (ipInfo.ipv6 != null) buffer.writeln('IPv6: ${ipInfo.ipv6}');
+    if (ipInfo.isp != null) buffer.writeln('ISP: ${ipInfo.isp}');
+    if (ipInfo.organization != null) buffer.writeln('Organization: ${ipInfo.organization}');
+    if (ipInfo.country != null) buffer.writeln('Country: ${ipInfo.country}');
+    if (ipInfo.city != null) buffer.writeln('City: ${ipInfo.city}');
+    if (ipInfo.region != null) buffer.writeln('Region: ${ipInfo.region}');
+    if (ipInfo.timezone != null) buffer.writeln('Timezone: ${ipInfo.timezone}');
+    if (ipInfo.latitude != null && ipInfo.longitude != null) {
+      buffer.writeln('Location: ${ipInfo.latitude}, ${ipInfo.longitude}');
+    }
+    buffer.writeln('\nShared from What Is My IP app');
+    buffer.writeln('Powered by digdns.io');
+
+    Share.share(buffer.toString());
+  }
+
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    if (state == AppLifecycleState.resumed) {
+      // App came to foreground - check IP change
+      final ipNotifier = ref.read(ipProvider.notifier);
+      // Small delay to ensure network is ready
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          ipNotifier.checkIpOnResume();
+        }
+      });
+    }
   }
 
   void _setupConnectivityListener() {
@@ -246,7 +389,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // Small delay to ensure network is ready
           Future.delayed(const Duration(seconds: 1), () {
             if (mounted) {
-              context.read<IpProvider>().refresh();
+              ref.read(ipProvider.notifier).refresh();
             }
           });
         }
@@ -255,6 +398,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _loadBannerAd() async {
+    // Don't load ads if ads are disabled globally
+    if (!AppConstants.adsEnabled) return;
     if (await AdService.isProUser()) return;
     
     _bannerAd = await AdService.createBannerAd(
@@ -268,82 +413,114 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _setupRouteListener() {
+    // Listen to route changes and update ads visibility
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _updateCurrentRoute();
+    });
+  }
+
+  void _updateCurrentRoute() {
+    if (!mounted) return;
+    
+    try {
+      final router = GoRouter.of(context);
+      final currentPath = router.routerDelegate.currentConfiguration.uri.path;
+      
+      if (_currentRoute != currentPath) {
+        setState(() {
+          _currentRoute = currentPath;
+        });
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+  }
+
+  bool _shouldShowAds() {
+    // Don't show ads if ads are disabled globally
+    if (!AppConstants.adsEnabled) return false;
+    
+    if (!_isBannerAdReady || _bannerAd == null) {
+      return false;
+    }
+    
+    // Use cached route or get current route
+    String? currentPath = _currentRoute;
+    if (currentPath == null) {
+      try {
+        final router = GoRouter.of(context);
+        currentPath = router.routerDelegate.currentConfiguration.uri.path;
+        _currentRoute = currentPath;
+      } catch (e) {
+        return (ModalRoute.of(context)?.isCurrent) ?? true;
+      }
+    }
+    
+    // Hide ads on full-screen routes
+    if (currentPath.startsWith('/tools/') ||
+        currentPath == '/ip-history') {
+      return false;
+    }
+    
+    // Only show ads on home screen routes
+    return currentPath == '/' || currentPath == '/home';
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _connectivitySubscription?.cancel();
     _bannerAd?.dispose();
     super.dispose();
   }
 
+
   Future<void> _handleBackPress() async {
     if (!mounted) return;
     
-    // Check if we're on home tab (index 0)
-    final isOnHomeTab = _currentIndex == 0;
+    final backButtonNotifier = ref.read(backButtonProvider.notifier);
+    // Get current path from GoRouter
+    final router = GoRouter.of(context);
+    final currentPath = router.routerDelegate.currentConfiguration.uri.path;
     
-    if (isOnHomeTab) {
-      // If on home tab, show exit confirmation
-      if (!mounted) return;
-      
-      final shouldExit = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogContext) => AlertDialog(
-          backgroundColor: Colors.grey[900],
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text(
-            'Exit App?',
-            style: TextStyle(color: Colors.white, fontSize: 20),
-          ),
-          content: const Text(
-            'Do you want to exit the app?',
-            style: TextStyle(color: Colors.white70, fontSize: 16),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: Colors.white70),
-              ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text(
-                'Exit',
-                style: TextStyle(color: Colors.red),
-              ),
-            ),
-          ],
-        ),
-      );
-      
-      if (shouldExit == true && mounted) {
-        // Exit app
-        SystemNavigator.pop();
-      }
-    } else {
-      // Navigate to home tab if on other tabs
-      if (mounted) {
-        widget.navigationShell?.goBranch(0);
-      }
+    final shouldPreventExit = await backButtonNotifier.handleBackPress(
+      context,
+      currentPath,
+      navigationShell: widget.navigationShell,
+    );
+    
+    // If double-tap confirmed, exit app
+    if (!shouldPreventExit && mounted) {
+      SystemNavigator.pop();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Update current route on each build to hide/show ads accordingly
+    _updateCurrentRoute();
+    
     return PopScope(
-      canPop: false,
-      onPopInvoked: (didPop) {
-        if (didPop) return;
-        if (!mounted) return;
-        
-        // Use Future.microtask to ensure dialog shows properly
-        Future.microtask(() => _handleBackPress());
+      canPop: false, // CRITICAL: Always prevent default pop behavior
+      onPopInvoked: (didPop) async {
+        if (didPop) {
+          return;
+        }
+        if (!mounted) {
+          return;
+        }
+        await _handleBackPress();
       },
-      child: Scaffold(
+      child: BackButtonListener(
+        onBackButtonPressed: () async {
+          if (!mounted) {
+            return true;
+          }
+          await _handleBackPress();
+          return true; // Always consume to prevent default behavior
+        },
+        child: Scaffold(
         backgroundColor: Colors.transparent,
         body: Stack(
           children: [
@@ -364,13 +541,14 @@ class _HomeScreenState extends State<HomeScreen> {
         bottomNavigationBar: widget.navigationShell != null
             ? _buildBottomNav()
             : null,
-        bottomSheet: _isBannerAdReady && _bannerAd != null
+        bottomSheet: _shouldShowAds()
             ? Container(
                 height: _bannerAd!.size.height.toDouble(),
                 alignment: Alignment.center,
                 child: AdWidget(ad: _bannerAd!),
               )
             : null,
+        ),
       ),
     );
   }
@@ -379,7 +557,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return RefreshIndicator(
       onRefresh: () async {
-        await context.read<IpProvider>().refresh();
+        await ref.read(ipProvider.notifier).refresh();
       },
       color: AppColors.neonBlue,
       backgroundColor: Colors.black.withOpacity(0.3),
@@ -426,33 +604,55 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
-                    // Refresh icon on right
-                    Consumer<IpProvider>(
-                      builder: (context, ipProvider, child) {
-                        return Material(
-                          color: Colors.transparent,
-                          child: IconButton(
-                            onPressed: ipProvider.isLoading
-                                ? null
-                                : () => ipProvider.refresh(),
-                            icon: ipProvider.isLoading
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.refresh_rounded,
+                    // Share and Refresh icons on right
+                    Consumer(
+                      builder: (context, ref, child) {
+                        final ipState = ref.watch(ipProvider);
+                        final ipNotifier = ref.read(ipProvider.notifier);
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Share button
+                            if (ipState.ipInfo != null)
+                              Material(
+                                color: Colors.transparent,
+                                child: IconButton(
+                                  onPressed: () => _shareIpInfo(context, ipState.ipInfo!),
+                                  icon: const Icon(
+                                    Icons.share_rounded,
                                     color: Colors.white,
                                     size: 24,
                                   ),
-                            tooltip: 'Refresh',
-                          ),
+                                  tooltip: 'Share IP Info',
+                                ),
+                              ),
+                            // Refresh button
+                            Material(
+                              color: Colors.transparent,
+                              child: IconButton(
+                                onPressed: ipState.isLoading
+                                    ? null
+                                    : () => ipNotifier.refresh(),
+                                icon: ipState.isLoading
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(
+                                            Colors.white,
+                                          ),
+                                        ),
+                                      )
+                                    : const Icon(
+                                        Icons.refresh_rounded,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                tooltip: 'Refresh',
+                              ),
+                            ),
+                          ],
                         );
                       },
                     ),
@@ -485,9 +685,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildIpDetailsSection() {
-    return Consumer<IpProvider>(
-      builder: (context, ipProvider, child) {
-        if (ipProvider.isLoading) {
+    return Consumer(
+      builder: (context, ref, child) {
+        final ipState = ref.watch(ipProvider);
+        final ipNotifier = ref.read(ipProvider.notifier);
+        
+        if (ipState.isLoading) {
           return GlassCard(
             onTap: null,
             child: const Center(
@@ -496,7 +699,7 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
 
-        if (ipProvider.error != null && ipProvider.ipInfo == null) {
+        if (ipState.error != null && ipState.ipInfo == null) {
           return GlassCard(
             onTap: null,
             child: Padding(
@@ -520,7 +723,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    ipProvider.error!,
+                    ipState.error!,
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.8),
                       fontSize: 14,
@@ -529,7 +732,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
-                    onPressed: () => ipProvider.refresh(),
+                    onPressed: () => ipNotifier.refresh(),
                     icon: const Icon(Icons.refresh),
                     label: const Text(AppStrings.retry),
                     style: ElevatedButton.styleFrom(
@@ -547,10 +750,10 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
 
-        final ipInfo = ipProvider.ipInfo;
+        final ipInfo = ipState.ipInfo;
         final publicIpv4 = ipInfo?.ipv4;
         final publicIpv6 = ipInfo?.ipv6;
-        final ip = publicIpv4 ?? (ipProvider.error != null ? 'Not Available' : 'Loading...');
+        final ip = publicIpv4 ?? (ipState.error != null ? 'Not Available' : 'Loading...');
         
         // Check if IPv6 exists and is valid
         final hasValidIpv6 = publicIpv6 != null && 
@@ -600,14 +803,29 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    const Text(
-                      'Network Information',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
+                    const Expanded(
+                      child: Text(
+                        'Network Information',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
                       ),
+                    ),
+                    IconButton(
+                      onPressed: () {
+                        context.push('/ip-history');
+                      },
+                      icon: const Icon(
+                        Icons.history,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                      tooltip: 'View IP History',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
                     ),
                   ],
                 ),
@@ -707,7 +925,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         : null,
                   ),
                 ],
-                if (ipProvider.privateIp != null) ...[
+                if (ipState.privateIp != null) ...[
                   const SizedBox(height: 16),
                   Divider(
                     color: Colors.white.withOpacity(0.1),
@@ -716,11 +934,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 16),
                   _buildModernInfoRow(
                     AppStrings.privateIp,
-                    ipProvider.privateIp!,
+                    ipState.privateIp!,
                     Icons.router,
                   ),
                 ],
-                if (ipProvider.connectionType != null) ...[
+                if (ipState.connectionType != null) ...[
                   const SizedBox(height: 16),
                   Divider(
                     color: Colors.white.withOpacity(0.1),
@@ -729,11 +947,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 16),
                   _buildModernInfoRow(
                     AppStrings.connectionType,
-                    ipProvider.connectionType!,
+                    ipState.connectionType!,
                     Icons.signal_wifi_4_bar,
                   ),
                 ],
-                if (ipProvider.dnsServer != null) ...[
+                if (ipState.dnsServer != null) ...[
                   const SizedBox(height: 16),
                   Divider(
                     color: Colors.white.withOpacity(0.1),
@@ -742,7 +960,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 16),
                   _buildModernInfoRow(
                     AppStrings.dnsServer,
-                    ipProvider.dnsServer!,
+                    ipState.dnsServer!,
                     Icons.dns,
                   ),
                 ],
@@ -888,9 +1106,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildConnectionDetailsSection() {
-    return Consumer<IpProvider>(
-      builder: (context, ipProvider, child) {
-        final ipInfo = ipProvider.ipInfo;
+    return Consumer(
+      builder: (context, ref, child) {
+        final ipState = ref.watch(ipProvider);
+        final ipInfo = ipState.ipInfo;
         if (ipInfo == null) return const SizedBox();
 
         final hasData = ipInfo.isp != null ||
@@ -971,9 +1190,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildSecuritySection() {
-    return Consumer<IpProvider>(
-      builder: (context, ipProvider, child) {
-        final ipInfo = ipProvider.ipInfo;
+    return Consumer(
+      builder: (context, ref, child) {
+        final ipState = ref.watch(ipProvider);
+        final ipInfo = ipState.ipInfo;
         if (ipInfo == null) return const SizedBox();
 
         final hasSecurityData = ipInfo.isVpn != null ||
@@ -1179,9 +1399,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildAddressDetailsSection() {
-    return Consumer<IpProvider>(
-      builder: (context, ipProvider, child) {
-        final ipInfo = ipProvider.ipInfo;
+    return Consumer(
+      builder: (context, ref, child) {
+        final ipState = ref.watch(ipProvider);
+        final ipInfo = ipState.ipInfo;
         if (ipInfo == null) return const SizedBox();
 
         final hasData = ipInfo.displayLocation.isNotEmpty ||
@@ -1283,30 +1504,33 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
                 const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      context.push('/detail', extra: ipInfo);
-                    },
-                    icon: const Icon(Icons.arrow_forward_rounded),
-                    label: const Text(
-                      AppStrings.viewDetails,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          context.push('/ip-history');
+                        },
+                        icon: const Icon(Icons.history),
+                        label: const Text(
+                          'History',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.purple.withOpacity(0.3),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 0,
+                        ),
                       ),
                     ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.neonBlue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      elevation: 0,
-                    ),
-                  ),
+                  ],
                 ),
               ],
             ),

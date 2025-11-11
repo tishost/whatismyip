@@ -82,7 +82,9 @@ app.*.map.json
 **/android/local.properties
 **/android/**/GeneratedPluginRegistrant.java
 **/android/key.properties
+**/android/keystore/
 *.jks
+*.keystore
 
 # Exceptions to above rules.
 !**/ios/**/default.mode1v3

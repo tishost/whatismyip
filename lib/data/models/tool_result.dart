@@ -6,6 +6,7 @@ enum ToolType {
   portScanner,
   traceroute,
   networkScan,
+  ssh,
 }
 
 class NetworkTool {
@@ -63,6 +64,14 @@ class NetworkTool {
       description: 'Trace network path',
       isPro: true,
     ),
+    // SSH Terminal - Disabled
+    // NetworkTool(
+    //   type: ToolType.ssh,
+    //   name: 'SSH Terminal',
+    //   icon: '💻',
+    //   description: 'Secure shell terminal client',
+    //   isPro: true,
+    // ),
   ];
 }
 

@@ -11,7 +11,7 @@ class AppTheme {
       brightness: Brightness.light,
     ),
     textTheme: GoogleFonts.poppinsTextTheme(),
-    scaffoldBackgroundColor: Colors.black,
+    scaffoldBackgroundColor: Colors.transparent,
     appBarTheme: AppBarTheme(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -32,7 +32,7 @@ class AppTheme {
       brightness: Brightness.dark,
     ),
     textTheme: GoogleFonts.poppinsTextTheme(ThemeData.dark().textTheme),
-    scaffoldBackgroundColor: Colors.black,
+    scaffoldBackgroundColor: Colors.transparent,
     appBarTheme: AppBarTheme(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -58,9 +58,9 @@ class AppTheme {
                 const Color(0xFF4A0D7A), // Darker violet
               ]
             : [
-                AppColors.deepBlue,
-                AppColors.purple,
-                AppColors.violet,
+                Color.lerp(AppColors.deepBlue, Colors.white, 0.1) ?? AppColors.deepBlue,
+                Color.lerp(AppColors.purple, Colors.white, 0.2) ?? AppColors.purple,
+                Color.lerp(AppColors.violet, Colors.white, 0.15) ?? AppColors.violet,
               ],
       ),
     );

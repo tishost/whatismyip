@@ -1,8 +1,8 @@
 class AppConstants {
   // App Info
   static const String appName = 'What Is My IP';
-  static const String appVersion = '1.0.0';
-  static const int appVersionCode = 1;
+  static const String appVersion = '1.0.1';
+  static const int appVersionCode = 2;
   
   // API Endpoints
   static const String defaultIpApiEndpoint = 'https://ipapi.co';

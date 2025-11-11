@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:io';
 
 import '../widgets/glass_card.dart';
@@ -124,87 +126,113 @@ class _DeviceInfoScreenState extends State<DeviceInfoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ParticleBackground(
-      child: Container(
-        decoration: AppTheme.gradientBackground(),
-        child: SafeArea(
-          child: _isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(color: Colors.white),
-                )
-              : SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 20),
-                      const GradientText(
-                        'Device Information',
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Complete device specifications',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-                      if (_systemInfo != null && _systemInfo!.isNotEmpty)
-                        GlassCard(
-                          onTap: null,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'System Resources',
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          context.go('/');
+        }
+      },
+      child: ParticleBackground(
+        child: Container(
+          decoration: AppTheme.gradientBackground(
+            brightness: Theme.of(context).brightness,
+          ),
+          child: SafeArea(
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  )
+                : SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 20),
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: GradientText(
+                                'Device Information',
                                 style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
+                                  fontSize: 32,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              const SizedBox(height: 16),
-                              ..._systemInfo!.entries.map((entry) {
-                                return _buildInfoRow(entry.key, entry.value);
-                              }).toList(),
-                            ],
-                          ),
-                        ),
-                      if (_systemInfo != null && _systemInfo!.isNotEmpty)
-                        const SizedBox(height: 24),
-                      if (_deviceData != null)
-                        GlassCard(
-                          onTap: null,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Device Details',
-                                style: TextStyle(
+                            ),
+                            if (_deviceData != null || _systemInfo != null)
+                              IconButton(
+                                onPressed: () => _shareDeviceInfo(),
+                                icon: const Icon(
+                                  Icons.share_rounded,
                                   color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                                  size: 28,
                                 ),
+                                tooltip: 'Share Device Info',
                               ),
-                              const SizedBox(height: 16),
-                              ..._deviceData!.entries.map((entry) {
-                                if (entry.key == 'System Features') {
-                                  return _buildSystemFeaturesRow(entry.value.toString());
-                                }
-                                return _buildInfoRow(entry.key, entry.value.toString());
-                              }).toList(),
-                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Complete device specifications',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 16,
                           ),
                         ),
-                    ],
+                        const SizedBox(height: 32),
+                        if (_systemInfo != null && _systemInfo!.isNotEmpty)
+                          GlassCard(
+                            onTap: null,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'System Resources',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                ..._systemInfo!.entries.map((entry) {
+                                  return _buildInfoRow(entry.key, entry.value);
+                                }).toList(),
+                              ],
+                            ),
+                          ),
+                        if (_systemInfo != null && _systemInfo!.isNotEmpty)
+                          const SizedBox(height: 24),
+                        if (_deviceData != null)
+                          GlassCard(
+                            onTap: null,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Device Details',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                ..._deviceData!.entries.map((entry) {
+                                  if (entry.key == 'System Features') {
+                                    return _buildSystemFeaturesRow(entry.value.toString());
+                                  }
+                                  return _buildInfoRow(entry.key, entry.value.toString());
+                                }).toList(),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
+          ),
         ),
       ),
     );
@@ -324,6 +352,33 @@ class _DeviceInfoScreenState extends State<DeviceInfoScreen> {
         ],
       ),
     );
+  }
+
+  void _shareDeviceInfo() {
+    final buffer = StringBuffer();
+    buffer.writeln('📱 Device Information\n');
+    
+    if (_systemInfo != null && _systemInfo!.isNotEmpty) {
+      buffer.writeln('System Resources:');
+      _systemInfo!.forEach((key, value) {
+        buffer.writeln('$key: $value');
+      });
+      buffer.writeln('');
+    }
+    
+    if (_deviceData != null && _deviceData!.isNotEmpty) {
+      buffer.writeln('Device Details:');
+      _deviceData!.forEach((key, value) {
+        if (key != 'System Features' || value.toString().length < 200) {
+          buffer.writeln('$key: $value');
+        }
+      });
+    }
+    
+    buffer.writeln('\nShared from What Is My IP app');
+    buffer.writeln('Powered by digdns.io');
+    
+    Share.share(buffer.toString());
   }
 }
 

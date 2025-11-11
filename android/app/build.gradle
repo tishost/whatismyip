@@ -22,6 +22,15 @@ if (flutterVersionName == null) {
     flutterVersionName = '1.0'
 }
 
+// Load keystore properties for release signing
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withReader('UTF-8') { reader ->
+        keystoreProperties.load(reader)
+    }
+}
+
 android {
     namespace "io.digdns.whatismyip"
     compileSdkVersion 36
@@ -49,9 +58,39 @@ android {
         versionName flutterVersionName
     }
 
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                def keyAliasValue = keystoreProperties['keyAlias']?.trim()
+                def keyPasswordValue = keystoreProperties['keyPassword']?.trim()
+                def storePasswordValue = keystoreProperties['storePassword']?.trim()
+                def keystorePath = keystoreProperties['storeFile']?.trim()
+                
+                if (!keyAliasValue || !keyPasswordValue || !storePasswordValue || !keystorePath) {
+                    throw new GradleException("Missing required signing properties in key.properties. Required: keyAlias, keyPassword, storePassword, storeFile")
+                }
+                
+                // Path is relative to android/ directory
+                def keystoreFile = file("${rootProject.projectDir}/${keystorePath}")
+                if (!keystoreFile.exists()) {
+                    throw new GradleException("Keystore file not found: ${keystoreFile.absolutePath}")
+                }
+                
+                keyAlias keyAliasValue
+                keyPassword keyPasswordValue
+                storePassword storePasswordValue
+                storeFile keystoreFile
+            } else {
+                throw new GradleException("key.properties file not found at ${keystorePropertiesFile.absolutePath}")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig signingConfigs.debug
+            // CRITICAL: Always use release signing config for Play Store uploads
+            // This ensures the bundle is properly signed
+            signingConfig signingConfigs.release
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
@@ -64,6 +103,6 @@ flutter {
 }
 
 dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.1.0"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.9.24"
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
 }

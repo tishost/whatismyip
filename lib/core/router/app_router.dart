@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../data/models/ip_info.dart';
 import '../../presentation/screens/home_screen.dart';
-import '../../presentation/screens/detail_screen.dart';
 import '../../presentation/screens/tools_screen.dart';
 import '../../presentation/screens/settings_screen.dart';
 import '../../presentation/screens/device_info_screen.dart';
@@ -11,12 +9,29 @@ import '../../presentation/screens/tools/dns_screen.dart';
 import '../../presentation/screens/tools/whois_screen.dart';
 import '../../presentation/screens/tools/traceroute_screen.dart';
 import '../../presentation/screens/tools/speed_test_screen.dart';
+import '../../presentation/screens/tools/port_scanner_screen.dart';
+import '../../presentation/screens/tools/ssh_screen.dart';
+import '../../presentation/screens/ip_history_screen.dart';
+import '../../presentation/screens/splash_screen.dart';
 
 class AppRouter {
+  // Root navigator key for full-screen routes
+  static final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+  
   static final GoRouter router = GoRouter(
-    initialLocation: '/',
+    navigatorKey: rootNavigatorKey,
+    initialLocation: '/splash',
     debugLogDiagnostics: false,
     routes: [
+      // Splash screen route
+      GoRoute(
+        path: '/splash',
+        name: 'splash',
+        pageBuilder: (context, state) => MaterialPage(
+          key: state.pageKey,
+          child: const SplashScreen(),
+        ),
+      ),
       // Main shell route with bottom navigation
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
@@ -62,27 +77,7 @@ class AppRouter {
         ],
       ),
       
-      // Detail screens (full screen, no bottom nav)
-      GoRoute(
-        path: '/detail',
-        name: 'detail',
-        pageBuilder: (context, state) {
-          final ipInfo = state.extra as IpInfo?;
-          if (ipInfo == null) {
-            return MaterialPage(
-              child: Scaffold(
-                body: Center(child: Text('IP Info not found')),
-              ),
-            );
-          }
-          return MaterialPage(
-            key: state.pageKey,
-            child: DetailScreen(ipInfo: ipInfo),
-          );
-        },
-      ),
-      
-      // Tool screens
+      // Tool screens (full-screen routes, separate from /tools shell route)
       GoRoute(
         path: '/tools/ping',
         name: 'ping',
@@ -123,6 +118,30 @@ class AppRouter {
           child: const SpeedTestScreen(),
         ),
       ),
+      GoRoute(
+        path: '/tools/port-scanner',
+        name: 'port-scanner',
+        pageBuilder: (context, state) => MaterialPage(
+          key: state.pageKey,
+          child: const PortScannerScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/tools/ssh',
+        name: 'ssh',
+        pageBuilder: (context, state) => MaterialPage(
+          key: state.pageKey,
+          child: const SshScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/ip-history',
+        name: 'ip-history',
+        pageBuilder: (context, state) => MaterialPage(
+          key: state.pageKey,
+          child: const IpHistoryScreen(),
+        ),
+      ),
     ],
     errorBuilder: (context, state) => Scaffold(
       body: Center(
@@ -131,4 +150,3 @@ class AppRouter {
     ),
   );
 }
-

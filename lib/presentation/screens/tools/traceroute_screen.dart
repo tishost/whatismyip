@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 
 import '../../widgets/glass_card.dart';
 import '../../widgets/gradient_text.dart';
-import '../../../core/utils/app_theme.dart';
+import '../../widgets/tool_screen_wrapper.dart';
+import '../../widgets/common_input_decoration.dart';
+import '../../widgets/loading_indicator.dart';
 import '../../../core/constants/colors.dart';
 
 class TracerouteScreen extends StatefulWidget {
@@ -23,6 +24,26 @@ class _TracerouteScreenState extends State<TracerouteScreen> {
   bool _isTracing = false;
   Process? _traceProcess;
 
+  String _normalizeHost(String input) {
+    var s = input.trim().toLowerCase();
+    s = s.replaceAll(RegExp(r'^https?://'), '');
+    s = s.replaceAll(RegExp(r'^www\.'), '');
+    final q = s.indexOf('?');
+    if (q != -1) s = s.substring(0, q);
+    final slash = s.indexOf('/');
+    if (slash != -1) s = s.substring(0, slash);
+    return s;
+  }
+
+  bool _isValidIp(String host) {
+    try { return InternetAddress.tryParse(host) != null; } catch (_) { return false; }
+  }
+
+  bool _isValidDomain(String host) {
+    final re = RegExp(r'^(?!-)(?:[a-z0-9-]{1,63}(?<!-)\.)+(?:[a-z]{2,63}|xn--[a-z0-9]{1,59})$');
+    return re.hasMatch(host);
+  }
+
   @override
   void dispose() {
     _hostController.dispose();
@@ -31,13 +52,23 @@ class _TracerouteScreenState extends State<TracerouteScreen> {
   }
 
   Future<void> _startTraceroute() async {
-    final host = _hostController.text.trim();
+    FocusScope.of(context).unfocus();
+    final host = _normalizeHost(_hostController.text);
     if (host.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a host or IP address')),
       );
       return;
     }
+    if (!(_isValidIp(host) || _isValidDomain(host))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid IP (v4/v6) or domain, e.g., 8.8.8.8 or example.com')),
+      );
+      return;
+    }
+
+    _hostController.text = host;
+    _hostController.selection = TextSelection.fromPosition(TextPosition(offset: host.length));
 
     setState(() {
       _isTracing = true;
@@ -499,54 +530,17 @@ class _TracerouteScreenState extends State<TracerouteScreen> {
     });
   }
 
-  Widget _buildAppBar() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => context.go('/'),
-          ),
-          const Expanded(
-            child: GradientText(
-              'Traceroute',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvoked: (didPop) {
-        if (!didPop) {
-          // Navigate to home instead of popping
-          context.go('/');
-        }
+    return ToolScreenWrapper(
+      title: 'Traceroute',
+      onBackPressed: () {
+        _stopTraceroute();
       },
-      child: Scaffold(
-      body: Container(
-        decoration: AppTheme.gradientBackground(),
-        child: SafeArea(
-          child: Column(
-            children: [
-              _buildAppBar(),
-              Expanded(
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
                       GlassCard(
                         onTap: null,
                         child: Column(
@@ -555,34 +549,16 @@ class _TracerouteScreenState extends State<TracerouteScreen> {
                             TextField(
                               controller: _hostController,
                               style: const TextStyle(color: Colors.white),
-                              decoration: InputDecoration(
+                              keyboardType: TextInputType.url,
+                              textInputAction: TextInputAction.search,
+                              onSubmitted: (_) {
+                                if (_isTracing) return;
+                                FocusScope.of(context).unfocus();
+                                _startTraceroute();
+                              },
+                              decoration: CommonInputDecoration.textField(
                                 labelText: 'Host or IP Address',
-                                labelStyle: TextStyle(
-                                  color: Colors.white.withOpacity(0.7),
-                                ),
                                 hintText: 'example.com or 8.8.8.8',
-                                hintStyle: TextStyle(
-                                  color: Colors.white.withOpacity(0.5),
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: Colors.white.withOpacity(0.3),
-                                  ),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: Colors.white.withOpacity(0.3),
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: AppColors.neonBlue,
-                                    width: 2,
-                                  ),
-                                ),
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -591,11 +567,10 @@ class _TracerouteScreenState extends State<TracerouteScreen> {
                                 Expanded(
                                   child: ElevatedButton.icon(
                                     onPressed: _isTracing 
-                                        ? () {
-                                            _stopTraceroute();
-                                          }
-                                        : () {
-                                            _startTraceroute();
+                                        ? () { _stopTraceroute(); }
+                                        : () { 
+                                            FocusScope.of(context).unfocus();
+                                            _startTraceroute(); 
                                           },
                                     icon: Icon(_isTracing ? Icons.stop : Icons.play_arrow),
                                     label: Text(_isTracing ? 'Stop' : 'Start Traceroute'),
@@ -684,18 +659,11 @@ class _TracerouteScreenState extends State<TracerouteScreen> {
                       if (_isTracing) ...[
                         const SizedBox(height: 24),
                         const Center(
-                          child: CircularProgressIndicator(color: AppColors.neonBlue),
+                          child: CommonLoadingIndicator(),
                         ),
                       ],
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+        ],
       ),
-    ),
     );
   }
 }

@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../widgets/glass_card.dart';
 import '../../widgets/gradient_text.dart';
-import '../../../core/utils/app_theme.dart';
-import '../../../core/constants/colors.dart';
+import '../../widgets/tool_screen_wrapper.dart';
+import '../../widgets/common_input_decoration.dart';
+import '../../widgets/common_info_row.dart';
 
 class PingScreen extends StatefulWidget {
   const PingScreen({super.key});
@@ -26,6 +26,30 @@ class _PingScreenState extends State<PingScreen> {
   double _maxTime = 0;
   double _avgTime = 0;
 
+  String _normalizeHost(String input) {
+    var s = input.trim().toLowerCase();
+    s = s.replaceAll(RegExp(r'^https?://'), '');
+    s = s.replaceAll(RegExp(r'^www\.'), '');
+    final q = s.indexOf('?');
+    if (q != -1) s = s.substring(0, q);
+    final slash = s.indexOf('/');
+    if (slash != -1) s = s.substring(0, slash);
+    return s;
+  }
+
+  bool _isValidIp(String host) {
+    try {
+      return InternetAddress.tryParse(host) != null;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  bool _isValidDomain(String host) {
+    final re = RegExp(r'^(?!-)(?:[a-z0-9-]{1,63}(?<!-)\.)+(?:[a-z]{2,63}|xn--[a-z0-9]{1,59})$');
+    return re.hasMatch(host);
+  }
+
   @override
   void dispose() {
     _hostController.dispose();
@@ -34,13 +58,29 @@ class _PingScreenState extends State<PingScreen> {
   }
 
   Future<void> _startPing() async {
-    final host = _hostController.text.trim();
-    if (host.isEmpty) {
+    // Hide keyboard
+    FocusScope.of(context).unfocus();
+
+    final normalized = _normalizeHost(_hostController.text);
+    if (normalized.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a host or IP address')),
       );
       return;
     }
+
+    if (!(_isValidIp(normalized) || _isValidDomain(normalized))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid IP (v4/v6) or domain, e.g., 8.8.8.8 or example.com')),
+      );
+      return;
+    }
+
+    // Reflect normalized text
+    _hostController.text = normalized;
+    _hostController.selection = TextSelection.fromPosition(
+      TextPosition(offset: normalized.length),
+    );
 
     setState(() {
       _isPinging = true;
@@ -62,7 +102,7 @@ class _PingScreenState extends State<PingScreen> {
       final stopwatch = Stopwatch()..start();
 
       try {
-        final result = await InternetAddress.lookup(host);
+        final result = await InternetAddress.lookup(normalized);
         stopwatch.stop();
         final time = stopwatch.elapsedMilliseconds.toDouble();
 
@@ -96,215 +136,138 @@ class _PingScreenState extends State<PingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvoked: (didPop) {
-        if (!didPop) {
-          // Navigate to home instead of popping
-          context.go('/');
-        }
+    return ToolScreenWrapper(
+      title: 'Ping Test',
+      onBackPressed: () {
+        _stopPing();
       },
-      child: Scaffold(
-      body: Container(
-        decoration: AppTheme.gradientBackground(),
-        child: SafeArea(
-          child: Column(
-            children: [
-              _buildAppBar(),
-              Expanded(
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      GlassCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            TextField(
-                              controller: _hostController,
-                              style: const TextStyle(color: Colors.white),
-                              decoration: InputDecoration(
-                                labelText: 'Host or IP Address',
-                                labelStyle: TextStyle(
-                                  color: Colors.white.withOpacity(0.7),
-                                ),
-                                hintText: 'google.com or 8.8.8.8',
-                                hintStyle: TextStyle(
-                                  color: Colors.white.withOpacity(0.5),
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: Colors.white.withOpacity(0.3),
-                                  ),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: Colors.white.withOpacity(0.3),
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: AppColors.neonBlue,
-                                    width: 2,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: ElevatedButton.icon(
-                                    onPressed:
-                                        _isPinging ? _stopPing : _startPing,
-                                    icon: Icon(_isPinging
-                                        ? Icons.stop
-                                        : Icons.play_arrow),
-                                    label: Text(
-                                        _isPinging ? 'Stop' : 'Start Ping'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (_packetsSent > 0) ...[
-                        const SizedBox(height: 16),
-                        GlassCard(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const GradientText(
-                                'Statistics',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              _buildStatRow(
-                                  'Packets Sent', _packetsSent.toString()),
-                              _buildStatRow('Packets Received',
-                                  _packetsReceived.toString()),
-                              _buildStatRow('Lost',
-                                  '${_packetsSent - _packetsReceived} (${((_packetsSent - _packetsReceived) / _packetsSent * 100).toStringAsFixed(1)}%)'),
-                              if (_packetsReceived > 0) ...[
-                                _buildStatRow('Min Time',
-                                    '${_minTime.toStringAsFixed(2)}ms'),
-                                _buildStatRow('Max Time',
-                                    '${_maxTime.toStringAsFixed(2)}ms'),
-                                _buildStatRow('Avg Time',
-                                    '${_avgTime.toStringAsFixed(2)}ms'),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ],
-                      if (_pingResults.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        GlassCard(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const GradientText(
-                                'Ping Results',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              Container(
-                                height: 200,
-                                child: ListView.builder(
-                                  itemCount: _pingResults.length,
-                                  itemBuilder: (context, index) {
-                                    return Padding(
-                                      padding: const EdgeInsets.only(bottom: 8),
-                                      child: Text(
-                                        _pingResults[index],
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 14,
-                                          fontFamily: 'monospace',
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GlassCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: _hostController,
+                  style: const TextStyle(color: Colors.white),
+                  keyboardType: TextInputType.url,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) {
+                    if (_isPinging) return;
+                    FocusScope.of(context).unfocus();
+                    _startPing();
+                  },
+                  decoration: CommonInputDecoration.textField(
+                    labelText: 'Host or IP Address',
+                    hintText: 'google.com or 8.8.8.8',
                   ),
                 ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _isPinging
+                            ? _stopPing
+                            : () {
+                                FocusScope.of(context).unfocus();
+                                _startPing();
+                              },
+                        icon: Icon(_isPinging ? Icons.stop : Icons.play_arrow),
+                        label: Text(_isPinging ? 'Stop' : 'Start Ping'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (_packetsSent > 0) ...[
+            const SizedBox(height: 16),
+            GlassCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const GradientText(
+                    'Statistics',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  CommonStatRow(
+                    label: 'Packets Sent',
+                    value: _packetsSent.toString(),
+                  ),
+                  CommonStatRow(
+                    label: 'Packets Received',
+                    value: _packetsReceived.toString(),
+                  ),
+                  CommonStatRow(
+                    label: 'Lost',
+                    value: '${_packetsSent - _packetsReceived} (${((_packetsSent - _packetsReceived) / _packetsSent * 100).toStringAsFixed(1)}%)',
+                  ),
+                  if (_packetsReceived > 0) ...[
+                    CommonStatRow(
+                      label: 'Min Time',
+                      value: '${_minTime.toStringAsFixed(2)}ms',
+                    ),
+                    CommonStatRow(
+                      label: 'Max Time',
+                      value: '${_maxTime.toStringAsFixed(2)}ms',
+                    ),
+                    CommonStatRow(
+                      label: 'Avg Time',
+                      value: '${_avgTime.toStringAsFixed(2)}ms',
+                    ),
+                  ],
+                ],
               ),
-            ],
-          ),
-        ),
-      ),
-      ),
-    );
-  }
-
-  Widget _buildStatRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
-              fontSize: 14,
             ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAppBar() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () {
-              _stopPing();
-              context.go('/');
-            },
-          ),
-          const Expanded(
-            child: GradientText(
-              'Ping Test',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+          ],
+          if (_pingResults.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            GlassCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const GradientText(
+                    'Ping Results',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    height: 200,
+                    child: ListView.builder(
+                      itemCount: _pingResults.length,
+                      itemBuilder: (context, index) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(
+                            _pingResults[index],
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
   }
 }
+

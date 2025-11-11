@@ -1,38 +1,43 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_constants.dart';
 
-class ThemeProvider with ChangeNotifier {
+class ThemeNotifier extends StateNotifier<ThemeMode> {
   final SharedPreferences _prefs;
-  ThemeMode _themeMode = ThemeMode.system;
 
-  ThemeProvider(this._prefs) {
+  ThemeNotifier(this._prefs) : super(ThemeMode.system) {
     _loadTheme();
   }
 
-  ThemeMode get themeMode => _themeMode;
-
   void _loadTheme() {
     final themeString = _prefs.getString(AppConstants.keyThemeMode) ?? 'system';
-    _themeMode = ThemeMode.values.firstWhere(
+    state = ThemeMode.values.firstWhere(
       (mode) => mode.toString() == 'ThemeMode.$themeString',
       orElse: () => ThemeMode.system,
     );
-    notifyListeners();
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
-    _themeMode = mode;
+    state = mode;
     await _prefs.setString(AppConstants.keyThemeMode, mode.toString().split('.').last);
-    notifyListeners();
   }
 
-  bool get isDarkMode {
-    if (_themeMode == ThemeMode.system) {
-      return WidgetsBinding.instance.platformDispatcher.platformBrightness ==
-          Brightness.dark;
+  bool isDarkMode(BuildContext context) {
+    if (state == ThemeMode.system) {
+      return Theme.of(context).brightness == Brightness.dark;
     }
-    return _themeMode == ThemeMode.dark;
+    return state == ThemeMode.dark;
   }
 }
 
+// SharedPreferences provider - initialized in main
+final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
+  throw UnimplementedError('SharedPreferences must be overridden');
+});
+
+// Theme provider
+final themeProvider = StateNotifierProvider<ThemeNotifier, ThemeMode>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return ThemeNotifier(prefs);
+});
